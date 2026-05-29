@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String              @id @default(cuid())
+  email             String              @unique
+  passwordHash      String
+  avatarUrl         String?
+  avatarPreset      String              @default("gold")
+  inviteCode        String              @unique
+  referredById      String?
+  referredBy        User?               @relation("Referrals", fields: [referredById], references: [id])
+  referrals         User[]              @relation("Referrals")
+  vipLevel          Int                 @default(0)
+  twoFactorSecret   String?
+  twoFactorEnabled  Boolean             @default(false)
+  banned            Boolean             @default(false)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  wallet            Wallet?
+  earnings          EarningRecord[]
+  withdrawals       WithdrawalRequest[]
+  depositRequests   DepositRequest[]
+  vipUpgrades       VipUpgradeLog[]
+  taskCompletions   TaskCompletion[]
+}
+
+model Wallet {
+  id          String @id @default(cuid())
+  userId      String @unique
+  user        User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balance     Float  @default(0)
+  workDeposit Float  @default(0)
+}
+
+model DepositRequest {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount     Float
+  address    String
+  network    String
+  status     String    @default("PENDING")
+  createdAt  DateTime  @default(now())
+  reviewedAt DateTime?
+
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
+model VipUpgradeLog {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vipLevel      Int
+  planName      String
+  activationFee Float
+  workDeposit   Float
+  totalPaid     Float
+  createdAt     DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model EarningRecord {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  amount    Float
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, type])
+}
+
+model WithdrawalRequest {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount     Float
+  address    String
+  network    String
+  fee        Float     @default(0)
+  status     String    @default("PENDING")
+  createdAt  DateTime  @default(now())
+  reviewedAt DateTime?
+
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
+model PlanTask {
+  id          String           @id @default(cuid())
+  vipLevel    Int
+  title       String
+  content     String
+  link        String
+  sortOrder   Int              @default(0)
+  active      Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  completions TaskCompletion[]
+
+  @@index([vipLevel, active])
+}
+
+model TaskCompletion {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskId      String
+  task        PlanTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  dayKey      String
+  earnAmount  Float
+  completedAt DateTime @default(now())
+
+  @@unique([userId, taskId, dayKey])
+  @@index([userId, dayKey])
+  @@index([completedAt])
+}
